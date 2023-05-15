@@ -52,27 +52,27 @@ TrajectoryEvaluator::TrajectoryEvaluator(
       reference_line_(reference_line),
       init_s_(init_s) {
   const double start_time = 0.0;
-  const double end_time = FLAGS_trajectory_time_length;
+  const double end_time = FLAGS_trajectory_time_length;//结束时间8秒
   path_time_intervals_ = path_time_graph_->GetPathBlockingIntervals(
-      start_time, end_time, FLAGS_trajectory_time_resolution);
+      start_time, end_time, FLAGS_trajectory_time_resolution);//时间间隔0.1秒,0-8秒中t对应的障碍物的s_upper,s_lower放入intervals中
 
-  reference_s_dot_ = ComputeLongitudinalGuideVelocity(planning_target);
+  reference_s_dot_ = ComputeLongitudinalGuideVelocity(planning_target);//规划的终点对应速度
 
   // if we have a stop point along the reference line,
   // filter out the lon. trajectories that pass the stop point.
   double stop_point = std::numeric_limits<double>::max();
   if (planning_target.has_stop_point()) {
-    stop_point = planning_target.stop_point().s();
+    stop_point = planning_target.stop_point().s();//规划终点是停止点
   }
   for (const auto& lon_trajectory : lon_trajectories) {
     double lon_end_s = lon_trajectory->Evaluate(0, end_time);
     if (init_s[0] < stop_point &&
         lon_end_s + FLAGS_lattice_stop_buffer > stop_point) {
-      continue;
+      continue;//如果在停止点之前,并且纵向轨迹的终点在停止点之后(也就是超过了停止点),那么就舍弃该轨迹
     }
 
     if (!ConstraintChecker1d::IsValidLongitudinalTrajectory(*lon_trajectory)) {
-      continue;
+      continue;// 如果轨迹中有轨迹点的 v a jerk 超过限值,舍弃该轨迹
     }
     for (const auto& lat_trajectory : lat_trajectories) {
       /**
@@ -82,7 +82,7 @@ TrajectoryEvaluator::TrajectoryEvaluator(
         continue;
       }
       */
-      double cost = Evaluate(planning_target, lon_trajectory, lat_trajectory);
+      double cost = Evaluate(planning_target, lon_trajectory, lat_trajectory);// 插入轨迹对和cost
       cost_queue_.emplace(Trajectory1dPair(lon_trajectory, lat_trajectory),
                           cost);
     }

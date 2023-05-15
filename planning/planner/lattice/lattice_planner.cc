@@ -185,7 +185,7 @@ Status LatticePlanner::PlanOnReferenceLine(
          << (Clock::NowInSeconds() - current_time) * 1000;
   current_time = Clock::NowInSeconds();
 
-  // 5. generate 1d trajectory bundle for longitudinal and lateral respectively.
+  // 5. generate 1d trajectory bundle for longitudinal and lateral respectively. 轨迹评价
   Trajectory1dGenerator trajectory1d_generator(
       init_s, init_d, ptr_path_time_graph, ptr_prediction_querier);
   std::vector<std::shared_ptr<Curve1d>> lon_trajectory1d_bundle;
@@ -237,17 +237,17 @@ Status LatticePlanner::PlanOnReferenceLine(
   while (trajectory_evaluator.has_more_trajectory_pairs()) {
     double trajectory_pair_cost =
         trajectory_evaluator.top_trajectory_pair_cost();
-    auto trajectory_pair = trajectory_evaluator.next_top_trajectory_pair();
+    auto trajectory_pair = trajectory_evaluator.next_top_trajectory_pair();//代价最小的轨迹对
 
-    // combine two 1d trajectories to one 2d trajectory
+    // combine two 1d trajectories to one 2d trajectory 轨迹缝合该代价最小的轨迹对
     auto combined_trajectory = TrajectoryCombiner::Combine(
         *ptr_reference_line, *trajectory_pair.first, *trajectory_pair.second,
         planning_init_point.relative_time());
 
-    // check longitudinal and lateral acceleration
-    // considering trajectory curvatures
+    // check longitudinal and lateral acceleration 检查纵向和横向加速度
+    // considering trajectory curvatures 考虑轨迹的曲率
     auto result = ConstraintChecker::ValidTrajectory(combined_trajectory);
-    if (result != ConstraintChecker::Result::VALID) {
+    if (result != ConstraintChecker::Result::VALID) {//如果该轨迹对不有效
       ++combined_constraint_failure_count;
 
       switch (result) {
@@ -277,19 +277,19 @@ Status LatticePlanner::PlanOnReferenceLine(
       continue;
     }
 
-    // check collision with other obstacles
+    // check collision with other obstacles 障碍物检测
     if (collision_checker.InCollision(combined_trajectory)) {
-      ++collision_failure_count;
+      ++collision_failure_count; //碰撞检测失败；继续遍历
       continue;
     }
 
     // put combine trajectory into debug data
     const auto& combined_trajectory_points = combined_trajectory;
-    num_lattice_traj += 1;
+    num_lattice_traj += 1; //成功了，把轨迹放在referenceline内
     reference_line_info->SetTrajectory(combined_trajectory);
     reference_line_info->SetCost(reference_line_info->PriorityCost() +
-                                 trajectory_pair_cost);
-    reference_line_info->SetDrivable(true);
+                                 trajectory_pair_cost);//referenceline的代价另外加上该轨迹的代价
+    reference_line_info->SetDrivable(true);//该referenceline可行
 
     // Print the chosen end condition and start condition
     ADEBUG << "Starting Lon. State: s = " << init_s[0] << " ds = " << init_s[1]

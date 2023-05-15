@@ -220,11 +220,13 @@ std::vector<std::pair<double, double>> PathTimeGraph::GetPathBlockingIntervals(
     if (t > pt_obstacle.max_t() || t < pt_obstacle.min_t()) {
       continue;
     }
+      // 遍历所有有效的动态障碍物，找到该t时间内所有存在障碍物出现的s_lower和s_upper
+      // 根据传入的t，通过线性差值找到传入t对应的s_upper
     double s_upper = lerp(pt_obstacle.upper_left_point().s(),
                           pt_obstacle.upper_left_point().t(),
                           pt_obstacle.upper_right_point().s(),
                           pt_obstacle.upper_right_point().t(), t);
-
+    // 根据传入的t，通过线性差值找到传入t对应的s_lower
     double s_lower = lerp(pt_obstacle.bottom_left_point().s(),
                           pt_obstacle.bottom_left_point().t(),
                           pt_obstacle.bottom_right_point().s(),
@@ -240,7 +242,7 @@ PathTimeGraph::GetPathBlockingIntervals(const double t_start,
                                         const double t_end,
                                         const double t_resolution) {
   std::vector<std::vector<std::pair<double, double>>> intervals;
-  for (double t = t_start; t <= t_end; t += t_resolution) {
+  for (double t = t_start; t <= t_end; t += t_resolution) {//0-8秒，时间间隔0.1秒，遍历
     intervals.push_back(GetPathBlockingIntervals(t));
   }
   return intervals;
