@@ -65,15 +65,15 @@ std::vector<Condition> EndConditionSampler::SampleLonEndConditionsForCruising(
   for (size_t i = 1; i < num_of_time_samples; ++i) {
     auto ratio =
         static_cast<double>(i) / static_cast<double>(num_of_time_samples - 1);
-    time_samples[i] = FLAGS_trajectory_time_length * ratio;
+    time_samples[i] = FLAGS_trajectory_time_length * ratio;//  // 0.01, 1, 2, 3, 4, 5, 6, 7, 8
   }
   time_samples[0] = FLAGS_polynomial_minimal_param;
 
   std::vector<Condition> end_s_conditions;
-  for (const auto& time : time_samples) {
+  for (const auto& time : time_samples) { // 0.01, 1, 2, 3, 4, 5, 6, 7, 8
     double v_upper = std::min(feasible_region_.VUpper(time), ref_cruise_speed);
     double v_lower = feasible_region_.VLower(time);
-
+    // s,s',s"   即s,v,a
     State lower_end_s = {0.0, v_lower, 0.0};
     end_s_conditions.emplace_back(lower_end_s, time);
 
@@ -123,7 +123,7 @@ std::vector<Condition>
 EndConditionSampler::SampleLonEndConditionsForPathTimePoints() const {
   std::vector<Condition> end_s_conditions;
 
-  std::vector<SamplePoint> sample_points = QueryPathTimeObstacleSamplePoints();
+  std::vector<SamplePoint> sample_points = QueryPathTimeObstacleSamplePoints();//ST图上采样
   for (const SamplePoint& sample_point : sample_points) {
     if (sample_point.path_time_point.t() < FLAGS_polynomial_minimal_param) {
       continue;
@@ -131,10 +131,11 @@ EndConditionSampler::SampleLonEndConditionsForPathTimePoints() const {
     double s = sample_point.path_time_point.s();
     double v = sample_point.ref_v;
     double t = sample_point.path_time_point.t();
+    //删除超出s范围的
     if (s > feasible_region_.SUpper(t) || s < feasible_region_.SLower(t)) {
       continue;
     }
-    State end_state = {s, v, 0.0};
+    State end_state = {s, v, 0.0};// s s' s" = s v a
     end_s_conditions.emplace_back(end_state, t);
   }
   return end_s_conditions;
@@ -146,10 +147,10 @@ EndConditionSampler::QueryPathTimeObstacleSamplePoints() const {
       common::VehicleConfigHelper::Instance()->GetConfig();
   std::vector<SamplePoint> sample_points;
   for (const auto& path_time_obstacle :
-       ptr_path_time_graph_->GetPathTimeObstacles()) {
+       ptr_path_time_graph_->GetPathTimeObstacles()) {//ST图ptr_path_time_graph_全局的；来源于lattice_palnner.cc中的ST图的构建；
     std::string obstacle_id = path_time_obstacle.id();
-    QueryFollowPathTimePoints(vehicle_config, obstacle_id, &sample_points);
-    QueryOvertakePathTimePoints(vehicle_config, obstacle_id, &sample_points);
+    QueryFollowPathTimePoints(vehicle_config, obstacle_id, &sample_points);//跟车的点  ！！！重点每一个目标都有follow overtake的采集点
+    QueryOvertakePathTimePoints(vehicle_config, obstacle_id, &sample_points);//超车的点
   }
   return sample_points;
 }
@@ -159,21 +160,21 @@ void EndConditionSampler::QueryFollowPathTimePoints(
     std::vector<SamplePoint>* const sample_points) const {
   std::vector<STPoint> follow_path_time_points =
       ptr_path_time_graph_->GetObstacleSurroundingPoints(
-          obstacle_id, -FLAGS_numerical_epsilon, FLAGS_time_min_density);
+          obstacle_id, -FLAGS_numerical_epsilon, FLAGS_time_min_density);// 获取障碍物周围点的ST
 
   for (const auto& path_time_point : follow_path_time_points) {
     double v = ptr_prediction_querier_->ProjectVelocityAlongReferenceLine(
-        obstacle_id, path_time_point.s(), path_time_point.t());
+        obstacle_id, path_time_point.s(), path_time_point.t()); // 沿参考线速度投影,求出障碍物的速度在参考线方向的分量
     // Generate candidate s
     double s_upper = path_time_point.s() -
                      vehicle_config.vehicle_param().front_edge_to_center();
-    double s_lower = s_upper - FLAGS_default_lon_buffer;
+    double s_lower = s_upper - FLAGS_default_lon_buffer;// 5.0
     CHECK_GE(FLAGS_num_sample_follow_per_timestamp, 2U);
     double s_gap =
         FLAGS_default_lon_buffer /
-        static_cast<double>(FLAGS_num_sample_follow_per_timestamp - 1);
+        static_cast<double>(FLAGS_num_sample_follow_per_timestamp - 1);= // = 5.0/2.0 = 2.5
     for (size_t i = 0; i < FLAGS_num_sample_follow_per_timestamp; ++i) {
-      double s = s_lower + s_gap * static_cast<double>(i);
+      double s = s_lower + s_gap * static_cast<double>(i); // 三个点，从s_lower开始，包括s_lower,每隔2.5m取一个点
       SamplePoint sample_point;
       sample_point.path_time_point = path_time_point;
       sample_point.path_time_point.set_s(s);

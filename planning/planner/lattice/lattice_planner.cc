@@ -162,14 +162,14 @@ Status LatticePlanner::PlanOnReferenceLine(
   current_time = Clock::NowInSeconds();
 
   auto ptr_prediction_querier = std::make_shared<PredictionQuerier>(
-      frame->obstacles(), ptr_reference_line);
+      frame->obstacles(), ptr_reference_line);//1、frame->obstacles()会做哪些处理 
 
   // 4. parse the decision and get the planning target.
   auto ptr_path_time_graph = std::make_shared<PathTimeGraph>(
       ptr_prediction_querier->GetObstacles(), *ptr_reference_line,
       reference_line_info, init_s[0],
       init_s[0] + FLAGS_speed_lon_decision_horizon, 0.0,
-      FLAGS_trajectory_time_length, init_d);
+      FLAGS_trajectory_time_length, init_d);//构建ST图，在end_condition_sampler类中的follow overtake采集点中使用；
 
   double speed_limit =
       reference_line_info->reference_line().GetSpeedLimitFromS(init_s[0]);
@@ -185,9 +185,9 @@ Status LatticePlanner::PlanOnReferenceLine(
          << (Clock::NowInSeconds() - current_time) * 1000;
   current_time = Clock::NowInSeconds();
 
-  // 5. generate 1d trajectory bundle for longitudinal and lateral respectively. 轨迹评价
+  // 5. generate 1d trajectory bundle for longitudinal and lateral respectively. 轨迹产生 1、轨迹初始化 2、轨迹产生
   Trajectory1dGenerator trajectory1d_generator(
-      init_s, init_d, ptr_path_time_graph, ptr_prediction_querier);
+      init_s, init_d, ptr_path_time_graph, ptr_prediction_querier);//
   std::vector<std::shared_ptr<Curve1d>> lon_trajectory1d_bundle;
   std::vector<std::shared_ptr<Curve1d>> lat_trajectory1d_bundle;
   trajectory1d_generator.GenerateTrajectoryBundles(
@@ -237,17 +237,17 @@ Status LatticePlanner::PlanOnReferenceLine(
   while (trajectory_evaluator.has_more_trajectory_pairs()) {
     double trajectory_pair_cost =
         trajectory_evaluator.top_trajectory_pair_cost();
-    auto trajectory_pair = trajectory_evaluator.next_top_trajectory_pair();//代价最小的轨迹对
+    auto trajectory_pair = trajectory_evaluator.next_top_trajectory_pair();//拿出代价最小的轨迹对
 
     // combine two 1d trajectories to one 2d trajectory 轨迹缝合该代价最小的轨迹对
     auto combined_trajectory = TrajectoryCombiner::Combine(
         *ptr_reference_line, *trajectory_pair.first, *trajectory_pair.second,
-        planning_init_point.relative_time());
+        planning_init_point.relative_time());//缝合轨迹对，并且笛卡尔坐标系转到世界坐标系。
 
     // check longitudinal and lateral acceleration 检查纵向和横向加速度
     // considering trajectory curvatures 考虑轨迹的曲率
-    auto result = ConstraintChecker::ValidTrajectory(combined_trajectory);
-    if (result != ConstraintChecker::Result::VALID) {//如果该轨迹对不有效
+    auto result = ConstraintChecker::ValidTrajectory(combined_trajectory);//约束检查
+    if (result != ConstraintChecker::Result::VALID) {//如果该轨迹对 不有效
       ++combined_constraint_failure_count;
 
       switch (result) {

@@ -65,7 +65,7 @@ TrajectoryEvaluator::TrajectoryEvaluator(
     stop_point = planning_target.stop_point().s();//规划终点是停止点
   }
   for (const auto& lon_trajectory : lon_trajectories) {
-    double lon_end_s = lon_trajectory->Evaluate(0, end_time);
+    double lon_end_s = lon_trajectory->Evaluate(0, end_time);//8秒对应的S距离
     if (init_s[0] < stop_point &&
         lon_end_s + FLAGS_lattice_stop_buffer > stop_point) {
       continue;//如果在停止点之前,并且纵向轨迹的终点在停止点之后(也就是超过了停止点),那么就舍弃该轨迹
@@ -135,10 +135,10 @@ double TrajectoryEvaluator::Evaluate(
   // decides the longitudinal evaluation horizon for lateral trajectories.
   double evaluation_horizon =
       std::min(FLAGS_speed_lon_decision_horizon,
-               lon_trajectory->Evaluate(0, lon_trajectory->ParamLength()));
+               lon_trajectory->Evaluate(0, lon_trajectory->ParamLength()));//horizon指的是纵向到大的长度，S长度以纵向轨迹的长度为准。
   std::vector<double> s_values;
   for (double s = 0.0; s < evaluation_horizon;
-       s += FLAGS_trajectory_space_resolution) {
+       s += FLAGS_trajectory_space_resolution) {//FLAGS_trajectory_space_resolution颗粒度
     s_values.emplace_back(s);
   }
 
@@ -168,7 +168,7 @@ double TrajectoryEvaluator::LatOffsetCost(
   double lat_offset_start = lat_trajectory->Evaluate(0, 0.0);
   double cost_sqr_sum = 0.0;
   double cost_abs_sum = 0.0;
-  for (const auto& s : s_values) {
+  for (const auto& s : s_values) {//s_values是颗粒度
     double lat_offset = lat_trajectory->Evaluate(0, s);
     double cost = lat_offset / FLAGS_lat_offset_bound;
     if (lat_offset * lat_offset_start < 0.0) {
@@ -193,7 +193,7 @@ double TrajectoryEvaluator::LatComfortCost(
     double s_dotdot = lon_trajectory->Evaluate(2, t);
 
     double relative_s = s - init_s_[0];
-    double l_prime = lat_trajectory->Evaluate(1, relative_s);
+    double l_prime = lat_trajectory->Evaluate(1, relative_s);//相对的s对应的L
     double l_primeprime = lat_trajectory->Evaluate(2, relative_s);
     double cost = l_primeprime * s_dot * s_dot + l_prime * s_dotdot;
     max_cost = std::max(max_cost, std::fabs(cost));
@@ -207,7 +207,7 @@ double TrajectoryEvaluator::LonComfortCost(
   double cost_abs_sum = 0.0;
   for (double t = 0.0; t < FLAGS_trajectory_time_length;
        t += FLAGS_trajectory_time_resolution) {
-    double jerk = lon_trajectory->Evaluate(3, t);
+    double jerk = lon_trajectory->Evaluate(3, t);// 3是三阶导数 对应的jerk
     double cost = jerk / FLAGS_longitudinal_jerk_upper_bound;
     cost_sqr_sum += cost * cost;
     cost_abs_sum += std::fabs(cost);
@@ -221,14 +221,14 @@ double TrajectoryEvaluator::LonObjectiveCost(
     const std::vector<double>& ref_s_dots) const {
   double t_max = lon_trajectory->ParamLength();
   double dist_s =
-      lon_trajectory->Evaluate(0, t_max) - lon_trajectory->Evaluate(0, 0.0);
+      lon_trajectory->Evaluate(0, t_max) - lon_trajectory->Evaluate(0, 0.0);//8秒对应的S减去0秒对应的S
 
   double speed_cost_sqr_sum = 0.0;
   double speed_cost_weight_sum = 0.0;
   for (size_t i = 0; i < ref_s_dots.size(); ++i) {
     double t = static_cast<double>(i) * FLAGS_trajectory_time_resolution;
-    double cost = ref_s_dots[i] - lon_trajectory->Evaluate(1, t);
-    speed_cost_sqr_sum += t * t * std::fabs(cost);
+    double cost = ref_s_dots[i] - lon_trajectory->Evaluate(1, t);//1是一阶导 对应的速度
+    speed_cost_sqr_sum += t * t * std::fabs(cost);//轨迹上各个点的速度小于参考速度的代价
     speed_cost_weight_sum += t * t;
   }
   double speed_cost =
@@ -246,21 +246,22 @@ double TrajectoryEvaluator::LonCollisionCost(
   double cost_sqr_sum = 0.0;
   double cost_abs_sum = 0.0;
   for (size_t i = 0; i < path_time_intervals_.size(); ++i) {
-    const auto& pt_interval = path_time_intervals_[i];
+    const auto& pt_interval = path_time_intervals_[i];// 时间间隔0.1秒,0-8秒中t对应的障碍物的s_upper,s_lower放入intervals(path_time_intervals_)中
+
     if (pt_interval.empty()) {
       continue;
     }
     double t = static_cast<double>(i) * FLAGS_trajectory_time_resolution;
-    double traj_s = lon_trajectory->Evaluate(0, t);
-    double sigma = FLAGS_lon_collision_cost_std;
+    double traj_s = lon_trajectory->Evaluate(0, t);// t时刻对应的S
+    double sigma = FLAGS_lon_collision_cost_std;//
     for (const auto& m : pt_interval) {
       double dist = 0.0;
-      if (traj_s < m.first - FLAGS_lon_collision_yield_buffer) {
+      if (traj_s < m.first - FLAGS_lon_collision_yield_buffer) {//m.first = ST图障碍物的s_lower
         dist = m.first - FLAGS_lon_collision_yield_buffer - traj_s;
       } else if (traj_s > m.second + FLAGS_lon_collision_overtake_buffer) {
-        dist = traj_s - m.second - FLAGS_lon_collision_overtake_buffer;
+        dist = traj_s - m.second - FLAGS_lon_collision_overtake_buffer;//m.second = s_upper
       }
-      double cost = std::exp(-dist * dist / (2.0 * sigma * sigma));
+      double cost = std::exp(-dist * dist / (2.0 * sigma * sigma));//这里的dist实际应该不是0，exp是指数函数，这种情况成指数式增加。
 
       cost_sqr_sum += cost * cost;
       cost_abs_sum += cost;
@@ -269,7 +270,7 @@ double TrajectoryEvaluator::LonCollisionCost(
   return cost_sqr_sum / (cost_abs_sum + FLAGS_numerical_epsilon);
 }
 
-double TrajectoryEvaluator::CentripetalAccelerationCost(
+double TrajectoryEvaluator::CentripetalAccelerationCost( //向心加速度的代价
     const PtrTrajectory1d& lon_trajectory) const {
   // Assumes the vehicle is not obviously deviate from the reference line.
   double centripetal_acc_sum = 0.0;
@@ -280,7 +281,7 @@ double TrajectoryEvaluator::CentripetalAccelerationCost(
     double v = lon_trajectory->Evaluate(1, t);
     PathPoint ref_point = PathMatcher::MatchToPath(*reference_line_, s);
     ACHECK(ref_point.has_kappa());
-    double centripetal_acc = v * v * ref_point.kappa();
+    double centripetal_acc = v * v * ref_point.kappa();//v^2/r,centripetal向心加速度，
     centripetal_acc_sum += std::fabs(centripetal_acc);
     centripetal_acc_sqr_sum += centripetal_acc * centripetal_acc;
   }

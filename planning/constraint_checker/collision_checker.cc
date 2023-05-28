@@ -47,7 +47,7 @@ CollisionChecker::CollisionChecker(
   ptr_reference_line_info_ = ptr_reference_line_info;
   ptr_path_time_graph_ = ptr_path_time_graph;
   BuildPredictedEnvironment(obstacles, ego_vehicle_s, ego_vehicle_d,
-                            discretized_reference_line);
+                            discretized_reference_line);//predicted_bounding_rectangles_把需要考虑的障碍物的point->box再横纵向增加变成rectangles
 }
 
 bool CollisionChecker::InCollision(
@@ -83,7 +83,7 @@ bool CollisionChecker::InCollision(
 }
 
 bool CollisionChecker::InCollision(
-    const DiscretizedTrajectory& discretized_trajectory) {
+    const DiscretizedTrajectory& discretized_trajectory) {//discretized_trajectory缝合后的横纵向轨迹对
   CHECK_LE(discretized_trajectory.NumOfPoints(),
            predicted_bounding_rectangles_.size());
   const auto& vehicle_config =
@@ -140,13 +140,13 @@ void CollisionChecker::BuildPredictedEnvironment(
   double relative_time = 0.0;
   while (relative_time < FLAGS_trajectory_time_length) {
     std::vector<Box2d> predicted_env;
-    for (const Obstacle* obstacle : obstacles_considered) {
+    for (const Obstacle* obstacle : obstacles_considered) {//如要考虑的障碍物
       // If an obstacle has no trajectory, it is considered as static.
       // Obstacle::GetPointAtTime has handled this case.
       TrajectoryPoint point = obstacle->GetPointAtTime(relative_time);
       Box2d box = obstacle->GetBoundingBox(point);
-      box.LongitudinalExtend(2.0 * FLAGS_lon_collision_buffer);
-      box.LateralExtend(2.0 * FLAGS_lat_collision_buffer);
+      box.LongitudinalExtend(2.0 * FLAGS_lon_collision_buffer);//纵向扩张，增加
+      box.LateralExtend(2.0 * FLAGS_lat_collision_buffer);//横向扩张，增加
       predicted_env.push_back(std::move(box));
     }
     predicted_bounding_rectangles_.push_back(std::move(predicted_env));

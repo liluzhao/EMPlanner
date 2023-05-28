@@ -44,7 +44,7 @@ Trajectory1dGenerator::Trajectory1dGenerator(
     : init_lon_state_(lon_init_state),
       init_lat_state_(lat_init_state),
       end_condition_sampler_(lon_init_state, lat_init_state,
-                             ptr_path_time_graph, ptr_prediction_querier),
+                             ptr_path_time_graph, ptr_prediction_querier),//end_condition_sampler_初始化搞到采样点包括跟车和超车
       ptr_path_time_graph_(ptr_path_time_graph) {}
 
 void Trajectory1dGenerator::GenerateTrajectoryBundles(
@@ -101,19 +101,21 @@ void Trajectory1dGenerator::GenerateSpeedProfilesForPathTimeObstacles(
   GenerateTrajectory1DBundle<5>(init_lon_state_, end_conditions,
                                 ptr_lon_trajectory_bundle);
 }
-
+//纵向轨迹产生
 void Trajectory1dGenerator::GenerateLongitudinalTrajectoryBundle(
     const PlanningTarget& planning_target,
     Trajectory1DBundle* ptr_lon_trajectory_bundle) const {
   // cruising trajectories are planned regardlessly.
   GenerateSpeedProfilesForCruising(planning_target.cruise_speed(),
-                                   ptr_lon_trajectory_bundle);
-
-  GenerateSpeedProfilesForPathTimeObstacles(ptr_lon_trajectory_bundle);
+                                   ptr_lon_trajectory_bundle);//产生巡航速度的轨迹
+  // 基于障碍物的纵向规划和基于巡航规划没有本质区别，主要差异在于：末点的采样→根据起点和末点计
+  // 算五次多项式系数，由四次多项式换为五次多项式。原因在于根据障碍物ST图，我们可以确定末点的
+  // s、v、a(a=0)，即明确了六个变量(起始点s、v、a和末点的s、v、a)
+  GenerateSpeedProfilesForPathTimeObstacles(ptr_lon_trajectory_bundle);//产生障碍物的纵向轨迹
 
   if (planning_target.has_stop_point()) {
     GenerateSpeedProfilesForStopping(planning_target.stop_point().s(),
-                                     ptr_lon_trajectory_bundle);
+                                     ptr_lon_trajectory_bundle);//产生停车轨迹
   }
 }
 

@@ -256,7 +256,7 @@ std::pair<double, double> PathTimeGraph::get_time_range() const {
   return time_range_;
 }
 
-std::vector<STPoint> PathTimeGraph::GetObstacleSurroundingPoints(
+std::vector<STPoint> PathTimeGraph::GetObstacleSurroundingPoints(//lattice 中的end_condition_sampler中使用
     const std::string& obstacle_id, const double s_dist,
     const double t_min_density) const {
   ACHECK(t_min_density > 0.0);
@@ -266,24 +266,25 @@ std::vector<STPoint> PathTimeGraph::GetObstacleSurroundingPoints(
     return pt_pairs;
   }
 
-  const auto& pt_obstacle = path_time_obstacle_map_.at(obstacle_id);
+  const auto& pt_obstacle = path_time_obstacle_map_.at(obstacle_id);// 通过ID拿到障碍物相关信息
 
   double s0 = 0.0;
   double s1 = 0.0;
 
   double t0 = 0.0;
   double t1 = 0.0;
-  if (s_dist > 0.0) {
+  if (s_dist > 0.0) {// s_dist > 0.0 的时候表示的是超车
     s0 = pt_obstacle.upper_left_point().s();
     s1 = pt_obstacle.upper_right_point().s();
 
     t0 = pt_obstacle.upper_left_point().t();
     t1 = pt_obstacle.upper_right_point().t();
+    // else的时候代表的是跟车的情况，跟车的话是考虑ST图的下面
   } else {
     s0 = pt_obstacle.bottom_left_point().s();
     s1 = pt_obstacle.bottom_right_point().s();
 
-    t0 = pt_obstacle.bottom_left_point().t();
+    t0 = pt_obstacle.bottom_left_point().t();// 获取ST图的左下角和右下角的t
     t1 = pt_obstacle.bottom_right_point().t();
   }
 
@@ -293,6 +294,11 @@ std::vector<STPoint> PathTimeGraph::GetObstacleSurroundingPoints(
 
   size_t num_sections = static_cast<size_t>(time_gap / t_min_density + 1);
   double t_interval = time_gap / static_cast<double>(num_sections);
+  // t_min_density默认为1.0
+  // num_sections表示按照设定时间间隔,在障碍物的delte_t内能取多少段. + 1是为了保证num_sections的准确度,举个例子:
+  // 例如 t_min_density=2, time_gap=15, 那么time_gap / t_min_density=7.5, 那么数据类型在强转size_t的时候就
+  // 取了整数,那其实就丢失了0.5的精度, 如果 +1 的话, 7.5+1=8.5, static_cast<size_t>(8.5)=8, 这样就可以保证多出
+  // 来的0.5也会被考虑进去了
 
   for (size_t i = 0; i <= num_sections; ++i) {
     double t = t_interval * static_cast<double>(i) + t0;
