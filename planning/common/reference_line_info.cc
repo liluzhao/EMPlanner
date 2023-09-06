@@ -81,6 +81,7 @@ bool ReferenceLineInfo::Init(const std::vector<const Obstacle*>& obstacles) {
 
   InitFirstOverlaps();
 
+
   if (adc_sl_boundary_.end_s() < 0 ||
       adc_sl_boundary_.start_s() > reference_line_.Length()) {
     AWARN << "Vehicle SL " << adc_sl_boundary_.ShortDebugString()
