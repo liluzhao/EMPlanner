@@ -812,7 +812,7 @@ double ReferenceLine::GetSpeedLimitFromS(const double s) const {
     }
     speed_limit_found = true;
     speed_limit =
-        std::fmin(lane_waypoint.lane->lane().speed_limit(), speed_limit);
+        std::fmin(lane_waypoint.lane->lane().speed_limit(), speed_limit);//地图道路限速
   }
 
   if (!speed_limit_found) {

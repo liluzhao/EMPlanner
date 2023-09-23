@@ -29,43 +29,43 @@ using apollo::common::PathPoint;
 using apollo::common::TrajectoryPoint;
 using apollo::common::math::CartesianFrenetConverter;
 using apollo::common::math::PathMatcher;
-
+//横纵向轨迹拼接
 DiscretizedTrajectory TrajectoryCombiner::Combine(
     const std::vector<PathPoint>& reference_line, const Curve1d& lon_trajectory,
     const Curve1d& lat_trajectory, const double init_relative_time) {
   DiscretizedTrajectory combined_trajectory;
 
-  double s0 = lon_trajectory.Evaluate(0, 0.0);
-  double s_ref_max = reference_line.back().s();
+  double s0 = lon_trajectory.Evaluate(0, 0.0);//总想 轨迹的S0
+  double s_ref_max = reference_line.back().s();//参考线的最长s_max
   double accumulated_trajectory_s = 0.0;
   PathPoint prev_trajectory_point;
 
-  double last_s = -FLAGS_numerical_epsilon;
+  double last_s = -FLAGS_numerical_epsilon;//1e-6
   double t_param = 0.0;
-  while (t_param < FLAGS_trajectory_time_length) {
+  while (t_param < FLAGS_trajectory_time_length) {//FLAGS_trajectory_time_length 8s
     // linear extrapolation is handled internally in LatticeTrajectory1d;
     // no worry about t_param > lon_trajectory.ParamLength() situation
-    double s = lon_trajectory.Evaluate(0, t_param);
+    double s = lon_trajectory.Evaluate(0, t_param);//位置
     if (last_s > 0.0) {
       s = std::max(last_s, s);
     }
     last_s = s;
 
     double s_dot =
-        std::max(FLAGS_numerical_epsilon, lon_trajectory.Evaluate(1, t_param));
-    double s_ddot = lon_trajectory.Evaluate(2, t_param);
+        std::max(FLAGS_numerical_epsilon, lon_trajectory.Evaluate(1, t_param));//速度
+    double s_ddot = lon_trajectory.Evaluate(2, t_param);//加速度
     if (s > s_ref_max) {
       break;
     }
 
-    double relative_s = s - s0;
+    double relative_s = s - s0;//位置差值
     // linear extrapolation is handled internally in LatticeTrajectory1d;
     // no worry about s_param > lat_trajectory.ParamLength() situation
-    double d = lat_trajectory.Evaluate(0, relative_s);
-    double d_prime = lat_trajectory.Evaluate(1, relative_s);
-    double d_pprime = lat_trajectory.Evaluate(2, relative_s);
+    double d = lat_trajectory.Evaluate(0, relative_s);//s对应的横向轨迹的l
+    double d_prime = lat_trajectory.Evaluate(1, relative_s);//s对应的横向轨迹的dl
+    double d_pprime = lat_trajectory.Evaluate(2, relative_s);//s对应的横向轨迹的ddl
 
-    PathPoint matched_ref_point = PathMatcher::MatchToPath(reference_line, s);
+    PathPoint matched_ref_point = PathMatcher::MatchToPath(reference_line, s);//s在reference上的匹配点
 
     double x = 0.0;
     double y = 0.0;
@@ -85,7 +85,7 @@ DiscretizedTrajectory TrajectoryCombiner::Combine(
     std::array<double, 3> d_conditions = {d, d_prime, d_pprime};
     CartesianFrenetConverter::frenet_to_cartesian(
         rs, rx, ry, rtheta, rkappa, rdkappa, s_conditions, d_conditions, &x, &y,
-        &theta, &kappa, &v, &a);
+        &theta, &kappa, &v, &a);//转到世界坐标系下面
 
     if (prev_trajectory_point.has_x() && prev_trajectory_point.has_y()) {
       double delta_x = x - prev_trajectory_point.x();
@@ -102,11 +102,11 @@ DiscretizedTrajectory TrajectoryCombiner::Combine(
     trajectory_point.mutable_path_point()->set_kappa(kappa);
     trajectory_point.set_v(v);
     trajectory_point.set_a(a);
-    trajectory_point.set_relative_time(t_param + init_relative_time);
+    trajectory_point.set_relative_time(t_param + init_relative_time);//加上初试时间等于世界时间下面
 
     combined_trajectory.AppendTrajectoryPoint(trajectory_point);
 
-    t_param = t_param + FLAGS_trajectory_time_resolution;
+    t_param = t_param + FLAGS_trajectory_time_resolution;//FLAGS_trajectory_time_resolution 0.1秒
 
     prev_trajectory_point = trajectory_point.path_point();
   }
